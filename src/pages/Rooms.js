@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useTheme } from '@mui/material/styles';
-import { Container, Typography, Button, TextField, Dialog, DialogTitle, DialogContent, DialogActions, Select, InputLabel, MenuItem, FormControl, OutlinedInput, Chip } from '@mui/material';
+import { Container, Typography, Button, TextField, Dialog, DialogTitle, DialogContent, DialogActions, Select, InputLabel, MenuItem, FormControl, OutlinedInput, Chip, InputBase, Grid } from '@mui/material';
 import { Alert } from '@mui/material';
 import RectangleIcon from '@mui/icons-material/CheckBoxOutlineBlank'; // Icona per il rettangolo
 import LineIcon from '@mui/icons-material/ShowChart'; // Icona per la linea
@@ -9,6 +9,30 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CloseIcon from '@mui/icons-material/Close';
 import axios from 'axios';
+
+import IconButton from '@mui/material/IconButton';
+import SearchIcon from '@mui/icons-material/Search';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+
+import HomeIcon from '@mui/icons-material/Home';
+import WorkIcon from '@mui/icons-material/Work';
+import PeopleIcon from '@mui/icons-material/People';
+import BuildIcon from '@mui/icons-material/Build';
+import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
+import MedicalServicesIcon from '@mui/icons-material/MedicalServices';
+import ElderlyIcon from '@mui/icons-material/Elderly';
+import EmojiPeopleIcon from '@mui/icons-material/EmojiPeople';
+import BoyIcon from '@mui/icons-material/Boy';
+import PersonIcon from '@mui/icons-material/Person';
+import AccessibleIcon from '@mui/icons-material/Accessible';
+import EngineeringIcon from '@mui/icons-material/Engineering';
+import MonitorHeartIcon from '@mui/icons-material/MonitorHeart';
+import AssistWalkerIcon from '@mui/icons-material/AssistWalker';
+import HealthAndSafetyIcon from '@mui/icons-material/HealthAndSafety';
+import ManIcon from '@mui/icons-material/Man';
+import RemoveRedEyeIcon from '@mui/icons-material/RemoveRedEye';
+import ConstructionIcon from '@mui/icons-material/Construction';
+import HomeRepairServiceIcon from '@mui/icons-material/HomeRepairService';
 
 export default function Rooms() {
   const theme = useTheme();
@@ -27,7 +51,32 @@ export default function Rooms() {
   const [selectedShape, setSelectedShape] = useState(null);
   const [selectedColor, setSelectedColor] = useState('#000000'); // Default color
   const [selectedRoles, setSelectedRoles] = useState([]);
-  const roles = ['Manager', 'Employee', 'Visitor', 'Maintenance'];
+
+  const roles = ['Manager', 'Employee', 'Visitor', 'Maintenance', 'Doctor', 'Patient', 'Equipment'];
+  const allIcons = {
+    HomeIcon: HomeIcon,
+    WorkIcon: WorkIcon,
+    PeopleIcon: PeopleIcon,
+    BuildIcon: BuildIcon,
+    ElderlyIcon: ElderlyIcon,
+    EmojiPeopleIcon: EmojiPeopleIcon,
+    BoyIcon: BoyIcon,
+    PersonIcon: PersonIcon,
+    AccessibleIcon: AccessibleIcon,
+    EngineeringIcon: EngineeringIcon,
+    LocalHospitalIcon: LocalHospitalIcon,
+    MedicalServicesIcon: MedicalServicesIcon,
+    MonitorHeartIcon: MonitorHeartIcon,
+    BuildIcon: BuildIcon,
+    AssistWalkerIcon: AssistWalkerIcon,
+    HealthAndSafetyIcon: HealthAndSafetyIcon,
+    ManIcon: ManIcon,
+    RemoveRedEyeIcon: RemoveRedEyeIcon,
+    ConstructionIcon: ConstructionIcon,
+    HomeRepairServiceIcon: HomeRepairServiceIcon,
+    HelpOutlineIcon: HelpOutlineIcon
+  };
+
   const [rooms, setRooms] = useState([]);
   const [infoMessage, setInfoMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -41,6 +90,93 @@ export default function Rooms() {
   const [pendingDeviceType, setPendingDeviceType] = useState(null);
 
   const [devicePositionsConfirmed, setDevicePositionsConfirmed] = useState(false);
+
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [floorIdToDelete, setFloorIdToDelete] = useState(null);
+
+  const [editSection, setEditSection] = useState(false);
+
+  const [roleIcons, setRoleIcons] = useState({});
+
+  useEffect(() => {
+    // Carica le icone dei ruoli dal backend all'avvio
+    const fetchRoleIcons = async () => {
+      try {
+        const response = await axios.get('/rooms/geticonsroles');
+        const iconsData = response.data;
+        console.log("iconsData:", iconsData)
+        const iconsByRole = {};
+        roles.forEach(role => {
+          const foundIcon = iconsData.find(icon => icon.role === role);
+          iconsByRole[role] = foundIcon ? foundIcon.icon : 'HelpOutlineIcon';  // Default icon if not found
+        });
+        console.log("roleIcons:", iconsByRole)
+        setRoleIcons(iconsByRole);
+      } catch (error) {
+        console.error('Failed to load role icons:', error);
+      }
+    };
+
+    fetchRoleIcons();
+  }, []);
+
+  const IconPicker = ({ selectedIcon, setSelectedIcon, role }) => {
+    const [open, setOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+
+    const filteredIcons = Object.keys(allIcons).filter(iconName =>
+      iconName.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    return (
+      <div>
+        <IconButton onClick={() => setOpen(true)}>
+          {selectedIcon ? React.createElement(allIcons[selectedIcon]) : <HelpOutlineIcon />}
+        </IconButton>
+        <Dialog open={open} onClose={() => setOpen(false)}>
+          <DialogTitle>Select Icon for {role}</DialogTitle>
+          <DialogContent>
+            <InputBase
+              placeholder="Search icon"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              fullWidth
+              sx={{ mb: 2 }}
+            />
+            <Grid container spacing={2} style={{ maxHeight: '300px', overflow: 'auto' }}>
+              {filteredIcons.map(iconName => (
+                <Grid item xs={3} key={iconName}>
+                  <IconButton onClick={() => {
+                    setSelectedIcon(iconName);
+                    setOpen(false);
+                    console.log(`Selected icon for ${role}: ${iconName}`);
+
+                    // invio al backend le info dell'icona
+                    axios.post('/rooms/iconroles', {
+                      role: role,
+                      iconId: iconName
+                    })
+                      .then(response => {
+                        console.log(`Successfully updated icon for ${role}: ${iconName}`, response.data);
+                      })
+                      .catch(error => {
+                        console.error(`Error updating icon for ${role}: ${iconName}`, error);
+                      });
+
+                  }}>
+                    {React.createElement(allIcons[iconName])}
+                  </IconButton>
+                </Grid>
+              ))}
+            </Grid>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setOpen(false)}>Close</Button>
+          </DialogActions>
+        </Dialog>
+      </div>
+    );
+  };
 
   const handleCloseDetails = () => {
     setSelectedRoomDetails(null);  // Presuppone che null nasconda i dettagli
@@ -153,7 +289,7 @@ export default function Rooms() {
   };
 
   useEffect(() => {
-    axios.get('/rooms/configurations')
+    axios.get('/rooms/floors')
       .then(response => {
         if (response.data.info) {
           // Gestisci il caso in cui la tabella non esiste
@@ -161,9 +297,9 @@ export default function Rooms() {
         } else {
           // Altrimenti, impostare le stanze ricevute
           setRooms(response.data);
-          const highestId = response.data.reduce((max, room) => Math.max(max, room.floor_id), 0);
+          const highestId = response.data.reduce((max, floor) => Math.max(max, floor.id), 0);
           setMaxFloorId(highestId);
-          console.log("highestId:", highestId)
+          console.log("highestId:", highestId);
         }
       })
       .catch(error => {
@@ -419,6 +555,7 @@ export default function Rooms() {
   };
 
   useEffect(() => {
+    console.log("redrawCanvas")
     redrawCanvas();
   }, [rectangles, lines]);
 
@@ -458,6 +595,7 @@ export default function Rooms() {
   };
 
   const redrawCanvas = () => {
+    console.log("rectangles:", rectangles)
     const canvas = canvasRef.current;
     const context = canvas.getContext('2d');
     // context.clearRect(0, 0, canvas.width, canvas.height);
@@ -483,16 +621,108 @@ export default function Rooms() {
       drawIcons(rect, context);
     });
 
-    // Disegna le icone dei dispositivi dopo aver disegnato le forme
-    // deviceIcons.forEach(icon => {
-    //   context.font = '20px Arial';
-    //   context.fillStyle = 'black'; // Assicurati che il testo sia visibile
-    //   context.fillText(icon.type, icon.x, icon.y);
-    // });
     // Assicurati che le icone dei dispositivi vengano disegnate dopo tutto il resto
     drawDeviceIcons(context);
   };
 
+
+  const handleEditedAreas = async () => {
+    console.log("Confirming edited areas...")
+    setLoading(true);
+
+    const newAreas = [];
+    const existingAreas = [];
+
+    rectangles.forEach(rect => {
+      if (rect.id) {
+        existingAreas.push(rect);
+      } else {
+        newAreas.push(rect);
+      }
+    });
+
+    // AREEE NUOVE
+    if (newAreas.length > 0) {
+      const transformedNewAreas = newAreas.map(rect => {
+        let coordinates = {};
+        if (rect.lines) {
+          // Per le forme create con le linee, converti l'array delle linee in una stringa JSON
+          coordinates = JSON.stringify(rect.lines.map(line => ({
+            fromX: line.fromX,
+            fromY: line.fromY,
+            toX: line.toX,
+            toY: line.toY
+          })));
+        } else {
+          // Per i rettangoli, crea un oggetto con le coordinate e convertilo in stringa JSON
+          coordinates = JSON.stringify({ x: rect.x, y: rect.y, width: rect.width, height: rect.height });
+        }
+
+        // Ritorna il nuovo oggetto senza i campi non necessari
+        return {
+          ...rect,
+          coordinates,
+          color: rect.color,
+          roles: rect.roles,
+          floor_id: maxFloorId,
+          floor_name: floorName
+        };
+      });
+
+      console.log("new areas:", transformedNewAreas);
+
+      const formData = new FormData();
+      formData.append('floordetails', JSON.stringify(transformedNewAreas));
+
+      if (canvasRef.current) {
+        const blob = await new Promise(resolve => canvasRef.current.toBlob(resolve));
+        const file = new File([blob], 'floorImage.png', { type: 'image/png' });
+        formData.append('floorImage', file);
+      }
+
+      console.log("formData:", formData)
+
+      // Send the POST request to the Flask REST API
+      axios.post('/rooms/addfloor', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      })
+        .then(response => {
+          console.log('Success:', response.data);
+          setSuccessMessage('Floor details added successfully.');
+          // alert('Floor details added successfully.');
+          setFloorName('');
+          setImage(null);
+          setRectangles([]);
+          setSelectedShape(null);
+          setSelectedRoles([]);
+          setSelectedColor('#000000');
+          setDeviceIcons([]);
+          setEditSection(false);
+          if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+          }
+          setTimeout(() => {
+            setSuccessMessage('');
+          }, 3000);
+        })
+        .catch(error => {
+          console.error('Error posting floor details:', error);
+        }).finally(() => {
+          setLoading(false);
+        });
+    }
+
+    // AREEE GIA ESISTENTI
+    if (existingAreas.length > 0) {
+      editExistedAreas(existingAreas);
+    }
+  };
+
+  const editExistedAreas = (existingAreas) => {
+    console.log("Edito aree esistenti:", existingAreas)
+  }
 
   const handleCanvasClick = ({ nativeEvent }) => {
     const { offsetX, offsetY } = nativeEvent;
@@ -546,7 +776,9 @@ export default function Rooms() {
   };
 
   useEffect(() => {
+    console.log("drawImage")
     if (rectangles.length == 0 && image) {
+      console.log("drawImage_0")
       const canvas = canvasRef.current;
       const context = canvas.getContext('2d');
       const img = new Image();
@@ -561,16 +793,13 @@ export default function Rooms() {
         canvas.width = img.width * scale;
         canvas.height = img.height * scale;
         context.drawImage(img, 0, 0, canvas.width, canvas.height);
-        // Disegna nuovamente le icone dei dispositivi dopo aver ridisegnato l'immagine
-        // deviceIcons.forEach(icon => {
-        //   context.font = '20px Arial';
-        //   context.fillText(icon.type, icon.x, icon.y);
-        // });
+
         drawDeviceIcons(context)
         rectangles.forEach(rect => drawIcons(rect, context));
       };
 
     } else if (rectangles.length > 0 && image) {
+      console.log("drawImage_1")
       const canvas = canvasRef.current;
       const context = canvas.getContext('2d');
       const img = document.getElementById('uploadedImage');
@@ -585,15 +814,10 @@ export default function Rooms() {
         canvas.height = img.height * scale;
         context.drawImage(img, 0, 0, canvas.width, canvas.height);
         rectangles.forEach(rect => drawIcons(rect, context));
-        // Disegna nuovamente le icone dei dispositivi dopo aver ridisegnato l'immagine
-        // deviceIcons.forEach(icon => {
-        //   context.font = '20px Arial';
-        //   context.fillText(icon.type, icon.x, icon.y);
-        // });
         drawDeviceIcons(context)
       };
     }
-  }, [image, rectangles]);
+  }, [image, rectangles, editSection]);
 
   function areLinesEqual(lines1, lines2) {
     if (lines1.length !== lines2.length) return false;
@@ -624,32 +848,80 @@ export default function Rooms() {
     return false;
   };
 
-  const handleRoomSelection = (room) => {
-    console.log(`Selected room: ${room.room_name}`);
-    console.log(`Room details:`, room);
-    // setSelectedShape(room);
-    // Check if roles is a string and parse it into an array
-    let parsedRoles = [];
-    try {
-      // Attempt to parse the roles if it's a string
-      parsedRoles = JSON.parse(room.roles);
-    } catch (e) {
-      console.error("Error parsing roles:", e);
-      parsedRoles = [];  // Default to an empty array in case of error
-    }
+  const handleRoomSelection = (floor) => {
+    console.log(`Selected floor: ${floor.floor_name}`);
+    console.log(`Floor details:`, floor);
+
+    setFloorName('')
+    setImage('');
+    setRectangles([]);
+    setEditSection(false);
 
     // Ensure parsedRoles is an array before setting it
-    setSelectedRoomDetails({ ...room, roles: parsedRoles });
+    setSelectedRoomDetails({ ...floor });
   };
 
-  const handleEditRoom = (roomDetails) => {
-    console.log("Editing room:", roomDetails);
-    // Implementation depends on your application needs
+  const handleEditRoom = (floorDetails) => {
+    console.log("Editing floor:", floorDetails);
+
+    setFloorName(floorDetails.floor_name);
+
+    setEditSection(true)
+    // Set the image of the floor plan
+    setImage(`data:image/png;base64,${floorDetails.piantina}`);
+
+    // Parse and set the areas on the canvas
+    const areas = floorDetails.areas.map(area => {
+      const coordinates = JSON.parse(area.coordinates);
+      const roles = JSON.parse(area.roles);
+
+      if (Array.isArray(coordinates)) {
+        // Shape created with lines
+        return {
+          ...area,
+          lines: coordinates,
+          closed: true,
+          color: area.color,
+          roles: roles,
+        };
+      } else {
+        // Rectangle shape
+        return {
+          ...area,
+          x: coordinates.x,
+          y: coordinates.y,
+          width: coordinates.width,
+          height: coordinates.height,
+          color: area.color,
+          roles: roles,
+        };
+      }
+    });
+
+    setRectangles(areas);
   };
 
-  const handleDeleteRoom = (roomId) => {
-    console.log("Deleting room ID:", roomId);
-    // Implementation depends on your application needs
+  const handleDeleteRoom = (floorId) => {
+    console.log("Deleting floor ID:", floorId);
+    setFloorIdToDelete(floorId);
+    setShowDeleteConfirmation(true);
+  };
+
+  const confirmDeleteFloor = () => {
+    axios.post('/rooms/deletefloor', { id: floorIdToDelete })
+      .then(response => {
+        console.log('Floor deleted successfully:', response.data);
+        setRooms(rooms.filter(room => room.id !== floorIdToDelete));
+        setShowDeleteConfirmation(false);
+        setFloorIdToDelete(null);
+        setSuccessMessage('Floor deleted successfully.');
+        setTimeout(() => {
+          setSuccessMessage('');
+        }, 3000);
+      })
+      .catch(error => {
+        console.error('Error deleting floor:', error);
+      });
   };
 
   return (
@@ -665,8 +937,26 @@ export default function Rooms() {
           </Typography>
         </div>
       )}
+      <Dialog
+        open={showDeleteConfirmation}
+        onClose={() => setShowDeleteConfirmation(false)}
+      >
+        <DialogTitle>Confirm Deletion</DialogTitle>
+        <DialogContent>
+          <Typography>Are you sure you want to delete this floor?</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowDeleteConfirmation(false)} color="primary">
+            Cancel
+          </Button>
+          <Button onClick={() => confirmDeleteFloor()} color="primary">
+            Confirm
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Helmet>
-        <title>Areas Settings</title>
+        <title>Floors/Areas Settings</title>
       </Helmet>
       <Dialog open={showForm} onClose={() => setShowForm(false)}>
         <DialogTitle>Enter Details for the Area</DialogTitle>
@@ -678,19 +968,19 @@ export default function Rooms() {
             type="text"
             fullWidth
             required
-            value={selectedShape ? selectedShape.name : ''}
+            value={selectedShape ? selectedShape.room_name : ''}
             variant="outlined"
-            onChange={(e) => setSelectedShape({ ...selectedShape, name: e.target.value, floor: floorName })}
+            onChange={(e) => setSelectedShape({ ...selectedShape, room_name: e.target.value, floor_name: floorName })}
           />
-          <TextField
+          {/* <TextField
             margin="dense"
             label="Floor Name"
             type="text"
             fullWidth
             disabled
-            value={floorName}
+            value={floorName ? floorName : selectedShape.floor_name}
             variant="outlined"
-          />
+          /> */}
           <FormControl margin="dense" fullWidth required>
             <InputLabel id="role-select-label">Who can enter here?</InputLabel>
             <Select
@@ -778,7 +1068,7 @@ export default function Rooms() {
             setSelectedRoles([]);
           }}
             color="primary"
-            disabled={!selectedShape || !selectedShape.name || selectedRoles.length === 0}>
+            disabled={!selectedShape || !selectedShape.room_name || selectedRoles.length === 0}>
             Save
           </Button>
         </DialogActions>
@@ -786,31 +1076,33 @@ export default function Rooms() {
 
       <Container maxWidth="xl">
         <Typography variant="h4" sx={{ mb: 1 }}>
-          Areas Settings
+          Floors Settings
         </Typography>
         <div style={{ display: 'flex', flexWrap: 'wrap' }}>
           {rooms.length > 0 ? (
-            rooms.map(room => (
-              <Button
-                key={room.id}
-                style={{
-                  backgroundColor: stringToColor(room.floor_name),
-                  color: '#fff',
-                  margin: '8px',
-                  padding: '10px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center'
-                }}
-                onClick={() => room.timestamp && handleRoomSelection(room)}
-              >
-                <Typography variant="subtitle1" component="div">
-                  {room.room_name}
-                </Typography>
-                <Typography variant="caption" component="div" style={{ textTransform: 'uppercase', fontWeight: 'bold' }}>
-                  {room.floor_name}
-                </Typography>
-              </Button>
+            rooms.map(floor => (
+              floor.floor_name !== "External" && (
+                <Button
+                  key={floor.id}
+                  style={{
+                    backgroundColor: stringToColor(floor.floor_name),
+                    color: '#fff',
+                    margin: '8px',
+                    padding: '10px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center'
+                  }}
+                  onClick={() => floor.timestamp && handleRoomSelection(floor)}
+                >
+                  <Typography variant="subtitle1" component="div" style={{ textTransform: 'uppercase', fontWeight: 'bold' }}>
+                    {floor.floor_name}
+                  </Typography>
+                  <Typography variant="caption" component="div">
+                    {floor.areas.length} areas inside
+                  </Typography>
+                </Button>
+              )
             ))
           ) : (
             <Alert sx={{ mb: 2 }} severity="info">{infoMessage || 'Loading...'}</Alert>
@@ -840,24 +1132,19 @@ export default function Rooms() {
             >
               <CloseIcon />
             </Button>
-            <Typography variant="h4" component="div">{selectedRoomDetails.room_name.toUpperCase()}</Typography>
-            <Typography variant="subtitle1" component="div">{`Floor: ${selectedRoomDetails.floor_name}`}</Typography>
-            {/* <Typography variant="subtitle1" component="div">
-              Color: <span style={{ backgroundColor: selectedRoomDetails.color, padding: '3px' }}>{selectedRoomDetails.color}</span>
-            </Typography> */}
-            <Typography variant="subtitle1" component="div">{`Can access: ${selectedRoomDetails.roles.join(', ')}`}</Typography>
+            <Typography variant="subtitle1" component="div" style={{ textTransform: 'uppercase', fontWeight: 'bold' }} >{`Floor: ${selectedRoomDetails.floor_name}`}</Typography>
             <Typography variant="subtitle1" component="div">
               {`Creation Date: ${formatTimestamp(selectedRoomDetails.timestamp)}`}
             </Typography>
             <div style={{ marginTop: '10px' }}>
-              <Button
+              {/* <Button
                 variant="outlined"
                 startIcon={<EditIcon />}
                 style={{ marginRight: '10px' }}
                 onClick={() => handleEditRoom(selectedRoomDetails)}
               >
                 Edit
-              </Button>
+              </Button> */}
               <Button
                 variant="outlined"
                 color="error"
@@ -869,20 +1156,32 @@ export default function Rooms() {
             </div>
           </div>
         )}
-        <Typography variant="h5" sx={{ mt: 2, mb: 2 }}>
-          Add Floor
-        </Typography>
+        {!editSection && (
+          <Typography variant="h5" sx={{ mt: 2, mb: 2 }}>
+            Add Floor
+          </Typography>
+        )}
+
+        {editSection && (
+          <Typography variant="h5" sx={{ mt: 2, mb: 2 }}>
+            Edit Floor
+          </Typography>
+        )}
+
         <form onSubmit={handleFloorSubmit}>
-          <TextField
-            label="Floor Name"
-            variant="outlined"
-            value={floorName}
-            onChange={e => setFloorName(e.target.value)}
-            required
-            disabled={!!image}
-            fullWidth
-            sx={{ mb: 2 }}  // Aggiunge spazio sotto il TextField
-          />
+          {!editSection && (
+            <TextField
+              label="Floor Name"
+              variant="outlined"
+              value={floorName}
+              onChange={e => setFloorName(e.target.value)}
+              required
+              disabled={!!image}
+              fullWidth
+              sx={{ mb: 2 }}  // Aggiunge spazio sotto il TextField
+            />
+          )}
+
           {successMessage && (
             <Alert severity="success" sx={{ mb: 2 }}>
               {successMessage}
@@ -901,14 +1200,14 @@ export default function Rooms() {
                   >
                     Rectangle
                   </Button>
-                  <Button
+                  {/* <Button
                     onClick={() => setDrawMode('line')}
                     startIcon={<LineIcon />}
                     variant={drawMode === 'line' ? 'contained' : 'outlined'}
                     color="primary"
                   >
                     Line
-                  </Button>
+                  </Button> */}
                   <Button
                     type="submit"
                     variant="contained"
@@ -924,7 +1223,7 @@ export default function Rooms() {
                 </>
               )}
 
-              {!devicePositionsConfirmed && (
+              {!devicePositionsConfirmed && !editSection && (
                 <>
                   <Button
                     onClick={() => prepareDeviceIcon('BS02')}
@@ -961,10 +1260,42 @@ export default function Rooms() {
                 </>
               )}
 
+              {editSection && (
+                <>
+                  <Button
+                    onClick={() => setDrawMode('rectangle')}
+                    startIcon={<RectangleIcon />}
+                    variant={drawMode === 'rectangle' ? 'contained' : 'outlined'}
+                    color="primary"
+                    sx={{ marginRight: 2 }}
+                  >
+                    Rectangle
+                  </Button>
+                  <Button
+                    onClick={() => setDrawMode('line')}
+                    startIcon={<LineIcon />}
+                    variant={drawMode === 'line' ? 'contained' : 'outlined'}
+                    color="primary"
+                  >
+                    Line
+                  </Button>
+                  <Button
+                    variant="contained"
+                    color="success"
+                    onClick={handleEditedAreas}
+                    sx={{
+                      width: '200px',
+                      marginLeft: 2
+                    }}
+                  >
+                    Confirm Edited Floor
+                  </Button>
+                </>
+              )}
 
             </div>
           )}
-          {floorName && (
+          {floorName && !editSection && (
             <input ref={fileInputRef} style={{ marginBottom: 20 }} type="file" onChange={handleImageChange} accept="image/*" />
           )}
           <canvas
@@ -982,6 +1313,24 @@ export default function Rooms() {
           ></canvas>
           <img id="uploadedImage" src={image} alt="Uploaded" style={{ display: 'none' }} />
         </form>
+
+        <Typography variant="h5" sx={{ mt: 2, mb: 2 }}>
+          Roles Settings
+        </Typography>
+        {roleIcons && roles && Object.keys(roleIcons).length > 0 && (
+          <Grid container spacing={2}>
+            {roles.map((role) => (
+              <Grid item xs={12} sm={6} md={4} key={role}>
+                <Typography variant="subtitle1">{role}</Typography>
+                <IconPicker
+                  selectedIcon={roleIcons[role] ? roleIcons[role] : "HelpOutlineIcon"}
+                  setSelectedIcon={(iconName) => setRoleIcons({ ...roleIcons, [role]: iconName })}
+                  role={role}
+                />
+              </Grid>
+            ))}
+          </Grid>
+        )}
       </Container>
     </>
   );
