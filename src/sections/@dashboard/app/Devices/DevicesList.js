@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import PropTypes from 'prop-types';
-import { Box, Stack, Link, Card, Button, Divider, Typography, CardHeader, Select, MenuItem, Alert, Snackbar, IconButton, Collapse, Grid, FormControl, InputLabel } from '@mui/material';
+import { Box, Stack, Link, Card, Button, Divider, Typography, CardHeader, Select, MenuItem, Menu, Alert, Snackbar, IconButton, Collapse, Grid, FormControl, InputLabel } from '@mui/material';
 import { fToNow } from '../../../../utils/formatTime';
 import Iconify from '../../../../components/iconify';
 import Scrollbar from '../../../../components/scrollbar';
@@ -17,6 +17,8 @@ import 'chartjs-adapter-date-fns';
 import annotationPlugin from 'chartjs-plugin-annotation';
 import Switch from '@mui/material/Switch';
 import useResponsive from 'src/hooks/useResponsive';
+
+import { Tooltip as MuiTooltip } from '@mui/material';
 
 // Registrazione dei componenti necessari di Chart.js
 ChartJS.register(
@@ -225,9 +227,8 @@ const optionsPression = {
   },
   scales: {
     y: {
-      beginAtZero: true,
-      min: 940, // Imposta il valore minimo dell'asse Y
-      max: 1060, // Imposta il valore massimo dell'asse Y
+      suggestedMin: undefined, // Rimuovi il valore statico per consentire un min dinamico
+      suggestedMax: undefined, // Rimuovi il valore statico per consentire un max dinamico
     },
     x: {
       ticks: {
@@ -336,6 +337,8 @@ export default function DeviceList() {
 
   const [deviceTimestamps, setDeviceTimestamps] = useState([]);
 
+  const [deviceRoles, setDeviceRoles] = useState({});
+
   const fetchDeviceTimestamps = async () => {
 
     try {
@@ -375,6 +378,55 @@ export default function DeviceList() {
       </Select>
     </FormControl>
   );
+
+  const [roleMenuAnchorEl, setRoleMenuAnchorEl] = useState(null);
+  const [selectedDeviceMac, setSelectedDeviceMac] = useState(null);
+  const roles = ['Manager', 'Employee', 'Visitor', 'Maintenance', 'Doctor', 'Patient', 'Equipment'];
+
+  const handleRoleMenuOpen = (event, macAddress) => {
+    setRoleMenuAnchorEl(event.currentTarget);
+    setSelectedDeviceMac(macAddress);
+  };
+
+  const handleRoleMenuClose = () => {
+    setRoleMenuAnchorEl(null);
+  };
+
+  const handleRoleSelect = async (role) => {
+    console.log(`Role ${role} selected for device ${selectedDeviceMac}`);
+    setDeviceRoles(prevRoles => ({
+      ...prevRoles,
+      [selectedDeviceMac]: role
+    }));
+    handleRoleMenuClose();
+
+    // invio i dati al backedn
+    try {
+      // Crea il corpo della richiesta
+      const body = JSON.stringify({
+        macAddress: selectedDeviceMac,
+        role: role
+      });
+
+      // Effettua la chiamata POST alla tua API per aggiornare il ruolo sul server
+      const response = await fetch('/current/setdevicesroles', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: body
+      });
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Failed to update device role');
+
+      // Qui puoi gestire ulteriori azioni dopo la conferma del cambio di ruolo
+      console.log('Role updated successfully:', result);
+
+    } catch (error) {
+      console.error('Error updating device role:', error);
+    }
+  };
 
   useEffect(() => {
     fetch('/current/table_counts')
@@ -1354,6 +1406,14 @@ export default function DeviceList() {
     return '#FF0000'; // Rosso per dati negli ultimi 10 minuti
   };
 
+  const getLiveDataColorBatt = (battery) => {
+
+    if (!battery) return '#808080'
+    if (battery >= 80) return '#006400'; // Verde per dati negli ultimi 2 minuti
+    if (battery >= 40 && battery <= 79) return '#FFA500'; // Giallo per dati negli ultimi 5 minuti
+    return '#FF0000'; // Rosso per dati negli ultimi 10 minuti
+  };
+
   const renderDatabaseInfo = (dbName, dbInfo) => {
     return (
       <Card variant="outlined" sx={{ mb: 2 }}>
@@ -1545,8 +1605,9 @@ export default function DeviceList() {
                 <TableCell>Type</TableCell>
                 <TableCell>MAC Address</TableCell>
                 <TableCell>IPv6</TableCell>
+                <TableCell>Version</TableCell>
                 <TableCell>Online</TableCell>
-                {/* <TableCell /> */}
+                <TableCell />
               </TableRow>
             </TableHead>
             <TableBody>
@@ -1556,21 +1617,105 @@ export default function DeviceList() {
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
                         {/* Semaforo per lo status */}
-                        <Box sx={{ width: 14, height: 14, borderRadius: '50%', backgroundColor: device.status ? getStatusColor(bs02Status[device.mac]?.status) : '#808080' }} />
+                        <MuiTooltip title="Historical Data Status" placement="top" arrow>
+                          <Box sx={{ width: 14, height: 14, borderRadius: '50%', backgroundColor: device.status ? getStatusColor(bs02Status[device.mac]?.status) : '#808080' }} />
+                        </MuiTooltip>
+
                         {/* Semaforo per la batteria */}
-                        <Box sx={{ width: 14, height: 14, borderRadius: '50%', ml: 1, backgroundColor: device.status ? getBatteryColor(bs02Status[device.mac]?.battery) : '#808080' }} />
+                        <MuiTooltip title="Last Battery Status" placement="top" arrow>
+                          <Box sx={{ width: 14, height: 14, borderRadius: '50%', ml: 1, backgroundColor: device.status ? getBatteryColor(bs02Status[device.mac]?.battery) : '#808080' }} />
+                        </MuiTooltip>
                       </Box>
                     </TableCell>
                     <TableCell>{renderDataOrIcon(device.name)}</TableCell>
                     <TableCell>{renderDataOrIcon(device.type)}</TableCell>
                     <TableCell>{renderDataOrIcon(device.mac)}</TableCell>
                     <TableCell>{renderDataOrIcon(device.ipv6)}</TableCell>
+                    <TableCell>{renderDataOrIcon(device.v)}</TableCell>
                     <TableCell>
                       <Switch
                         checked={device.status}
                         onChange={() => handleToggle(device.mac)}
                         color="primary"
                       />
+                    </TableCell>
+                    <TableCell>
+                      <IconButton onClick={() => setExpandedId(expandedId === device.mac ? null : device.mac)}>
+                        {expandedId === device.mac ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={7}>
+                      <Collapse in={expandedId === device.mac} timeout="auto" unmountOnExit>
+                        <Typography variant="h4" gutterBottom>
+                          Historical data
+                        </Typography>
+                        <Grid container spacing={2} justifyContent="center">
+                          {expandedId === device.mac ? (
+                            <>
+
+                              <Grid item xs={6}>
+                                <Typography variant="h6" gutterBottom>
+                                  Battery
+                                </Typography>
+                                <Box height="250px" width="100%">
+                                  <Bar ref={batteryChartRef} data={generateChartDataBattery(device.history ?? [], device.type === "banglejs2" ? 20 : 20)} options={batteryChartOptions} />
+                                </Box>
+                              </Grid>
+                              <Grid item xs={6}>
+                                <Typography variant="h6" gutterBottom>
+                                  Temperature
+                                </Typography>
+                                <Box height="250px" width="100%">
+                                  <Bar ref={tempChartRef} data={generateChartDataTemperature(device.history ?? [], device.type === "banglejs2" ? 20 : 20)} options={options} />
+                                </Box>
+                              </Grid>
+                              <Grid item xs={6}>
+                                <Typography variant="h6" gutterBottom>
+                                  Humidity
+                                </Typography>
+                                <Box height="250px" width="100%">
+                                  <Bar ref={humChartRef} data={generateChartDataHum(device.history ?? [], device.type === "banglejs2" ? 20 : 20)} options={options} />
+                                </Box>
+                              </Grid>
+                              <Grid item xs={6}>
+                                <Typography variant="h6" gutterBottom>
+                                  Log Messages
+                                </Typography>
+                                <TableContainer component={Paper} style={{ maxHeight: 250 }}>
+                                  <Table size="small">
+                                    <TableHead>
+                                      <TableRow>
+                                        <TableCell>Message</TableCell>
+                                        <TableCell>Timestamp</TableCell>
+                                      </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                      {logData[device.mac]?.map((log) => (
+                                        <TableRow key={log.id}>
+                                          <TableCell style={{ backgroundColor: isIPv6(log.type) ? 'yellow' : 'transparent' }}>
+                                            {log.type}
+                                          </TableCell>
+                                          <TableCell>
+                                            {new Date(log.timestamp * 1000).toLocaleString()}
+                                          </TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                </TableContainer>
+                              </Grid>
+                            </>
+                          ) : (
+                            <Grid item xs={12}>
+                              <Typography variant="subtitle1" gutterBottom>
+                                Expand to view charts.
+                              </Typography>
+                            </Grid>
+                          )}
+                        </Grid>
+                      </Collapse>
                     </TableCell>
                   </TableRow>
                 </React.Fragment>
@@ -1579,7 +1724,6 @@ export default function DeviceList() {
           </Table>
         </TableContainer>
       </Box>
-
 
       <Box p={3} sx={{ backgroundColor: 'rgba(255, 239, 213, 0.3)' }}> {/* Light Peach background */}
         <Typography variant="h4" p={3} sx={{ mb: 0, mt: 0 }}>
@@ -1591,8 +1735,13 @@ export default function DeviceList() {
               <TableRow>
                 <TableCell>Status</TableCell>
                 <TableCell>Name</TableCell>
+                <TableCell>Role</TableCell>
+                <TableCell>Last Position</TableCell>
                 <TableCell>Type</TableCell>
                 <TableCell>MAC Address</TableCell>
+                <TableCell>Version</TableCell>
+                <TableCell>User ID</TableCell>
+                <TableCell />
               </TableRow>
             </TableHead>
             <TableBody>
@@ -1602,14 +1751,54 @@ export default function DeviceList() {
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
                         {/* Traffic light for historical data */}
-                        <Box sx={{ width: 14, height: 14, borderRadius: '50%', backgroundColor: getHistoricalDataColor(deviceTimestamps[device.mac]?.last_timestamp_puck) }} />
+                        <MuiTooltip title="Historical Data Status" placement="top" arrow>
+                          <Box sx={{ width: 14, height: 14, borderRadius: '50%', backgroundColor: getHistoricalDataColor(deviceTimestamps[device.mac]?.last_timestamp_puck) }} />
+                        </MuiTooltip>
                         {/* Traffic light for live data */}
-                        <Box sx={{ width: 14, height: 14, borderRadius: '50%', ml: 1, backgroundColor: getLiveDataColor(deviceTimestamps[device.mac]?.last_timestamp_positioning) }} />
+                        <MuiTooltip title="Positioning Data Status" placement="top" arrow>
+                          <Box sx={{ width: 14, height: 14, borderRadius: '50%', ml: 1, backgroundColor: getLiveDataColor(deviceTimestamps[device.mac]?.last_timestamp_positioning) }} />
+                        </MuiTooltip>
+                        <MuiTooltip title="Last Battery Status" placement="top" arrow>
+                          <Box sx={{ width: 14, height: 14, borderRadius: '50%', ml: 1, backgroundColor: getLiveDataColorBatt(deviceTimestamps[device.mac]?.battery) }} />
+                        </MuiTooltip>
                       </Box>
                     </TableCell>
                     <TableCell>{renderDataOrIcon(device.name)}</TableCell>
+                    <TableCell
+                      onClick={(event) => handleRoleMenuOpen(event, device.mac)}
+                      sx={{
+                        cursor: 'pointer', // Cambia il cursore in un puntatore
+                        '&:hover': {
+                          backgroundColor: 'rgba(0, 0, 0, 0.04)', // Leggero sfondo al passaggio del mouse per feedback visivo
+                          textDecoration: 'underline' // Sottolinea il testo al passaggio del mouse
+                        }
+                      }}
+                    >
+                      {deviceRoles[device.mac] || device.role || "Unassigned"}
+                    </TableCell>
+                    <Menu
+                      id="role-menu"
+                      anchorEl={roleMenuAnchorEl}
+                      keepMounted
+                      open={Boolean(roleMenuAnchorEl)}
+                      onClose={handleRoleMenuClose}
+                    >
+                      {roles.map((role) => (
+                        <MenuItem key={role} onClick={() => handleRoleSelect(role)}>
+                          {role}
+                        </MenuItem>
+                      ))}
+                    </Menu>
+                    <TableCell>{renderDataOrIcon(deviceTimestamps[device.mac]?.last_position ? deviceTimestamps[device.mac]?.last_position : "...")}</TableCell>
                     <TableCell>{renderDataOrIcon(device.type)}</TableCell>
                     <TableCell>{renderDataOrIcon(device.mac)}</TableCell>
+                    <TableCell>{renderDataOrIcon(device.v)}</TableCell>
+                    <TableCell>{renderDataOrIcon(device.user_id.substring(0, 5))}</TableCell>
+                    <TableCell>
+                      <IconButton onClick={() => setExpandedId(expandedId === device.mac ? null : device.mac)}>
+                        {expandedId === device.mac ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                      </IconButton>
+                    </TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={7}>
@@ -1620,10 +1809,73 @@ export default function DeviceList() {
                         <Grid container spacing={2} justifyContent="center">
                           {expandedId === device.mac ? (
                             <>
+                              <Grid item xs={6}>
+                                <Typography variant="h6" gutterBottom>
+                                  Battery
+                                </Typography>
+                                <Box height="250px" width="100%">
+                                  <Bar ref={batteryChartRef} data={generateChartDataBattery(device.history ?? [], device.type === "banglejs2" ? 20 : 20)} options={batteryChartOptions} />
+                                </Box>
+                              </Grid>
+                              <Grid item xs={6}>
+                                <Typography variant="h6" gutterBottom>
+                                  Temperature
+                                </Typography>
+                                <Box height="250px" width="100%">
+                                  <Bar ref={tempChartRef} data={generateChartDataTemperature(device.history ?? [], device.type === "banglejs2" ? 20 : 20)} options={options} />
+                                </Box>
+                              </Grid>
+                              {device.type === "banglejs2" && (
+                                <>
+                                  <Grid item xs={6}>
+                                    <Typography variant="h6" gutterBottom>
+                                      Pressure
+                                    </Typography>
+                                    <Box height="250px" width="100%">
+                                      <Line ref={pressionChartRef} data={generateChartDataPression(device.history ?? [], device.type === "banglejs2" ? 20 : 20)} options={optionsPression} />
+                                    </Box>
+                                  </Grid>
+                                </>
+                              )}
+                              <Grid item xs={6}>
+                                <Typography variant="h6" gutterBottom>
+                                  Accelleration
+                                </Typography>
+                                <Box height="250px" width="100%">
+                                  <Bar ref={accChartRef} data={generateChartDataAcceleration(device.history ?? [], device.type === "banglejs2" ? 20 : 20)} options={options} />
+                                </Box>
+                              </Grid>
+                              {device.type === "banglejs2" && (
+                                <>
+                                  <Grid item xs={6}>
+                                    <Typography variant="h6" gutterBottom>
+                                      Hearth Rate
+                                    </Typography>
+                                    <Box height="250px" width="100%">
+                                      <Line ref={bpmChartRef} data={generateChartDataBpm(device.history ?? [], device.type === "banglejs2" ? 20 : 20)} options={options} />
+                                    </Box>
+                                  </Grid>
+                                  <Grid item xs={6}>
+                                    <Typography variant="h6" gutterBottom>
+                                      Steps
+                                    </Typography>
+                                    <Box height="250px" width="100%">
+                                      <Bar ref={stepsChartRef} data={generateChartDataSteps(device.history ?? [], device.type === "banglejs2" ? 20 : 20)} options={options} />
+                                    </Box>
+                                  </Grid>
+                                </>
+                              )}
                               <Grid item xs={12}>
                                 <Typography variant="h4" gutterBottom>
                                   Last day data
                                 </Typography>
+                                {/* <Box p={3}>
+                                  <Grid container spacing={2}>
+                                    <Grid item xs={12}>
+                                      {renderDurationSelector()}
+                                    </Grid>
+                                  </Grid>
+                                </Box> */}
                                 <Typography variant="h6" gutterBottom>
                                   RSSI Chart
                                 </Typography>
@@ -1757,6 +2009,33 @@ export default function DeviceList() {
                                   />
                                 </Box>
                               </Grid>
+                              <Grid item xs={12}>
+                                <Typography variant="h6" gutterBottom>
+                                  Live Connection
+                                </Typography>
+                                <Box height="250px" width="100%" style={{ width: '100%' }}>
+                                  <Line ref={liveconnectionChartRef}
+                                    data={generateLiveConnectionChartData(device.mac ?? "")}
+                                    options={liveConnectionChartOptions}
+                                  />
+                                </Box>
+                              </Grid>
+                              {device.type === "puckjs2" && (
+                                <>
+                                  <Grid item xs={12}>
+                                    <Typography variant="h6" gutterBottom>
+                                      Face Status
+                                    </Typography>
+                                    <Box height="250px" width="100%" style={{ width: '100%' }}>
+                                      <Line
+                                        ref={facestatusChartRef}
+                                        data={generateDiceFaceChartData(device.mac ?? "")}
+                                        options={faceStatusChartOptions}
+                                      />
+                                    </Box>
+                                  </Grid>
+                                </>
+                              )}
                             </>
                           ) : (
                             <Grid item xs={12}>
@@ -1775,6 +2054,6 @@ export default function DeviceList() {
           </Table>
         </TableContainer>
       </Box>
-    </Card>
+    </Card >
   );
 }
